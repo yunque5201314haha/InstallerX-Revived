@@ -16,14 +16,13 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: 2. 安全同步 (保留此yml)
+      - name: 2. 同步上游 (保留此yml)
         run: |
           git config --global user.name "github-actions[bot]"
           git config --global user.email "github-actions[bot]@users.noreply.github.com"
           git remote add upstream https://github.com/wxxsfxyzm/InstallerX-Revived.git
           git fetch upstream
-          # 使用 merge -X ours 确保你的 yml 配置文件不会被冲掉
-          git merge upstream/main --allow-unrelated-histories -X ours
+          git merge upstream/main --allow-unrelated-histories -X ours -m "chore: sync upstream"
           git push origin main
 
       - name: 3. 设置 Java 21
@@ -33,47 +32,70 @@ jobs:
           distribution: 'temurin'
           cache: 'gradle'
 
-      - name: 4. 暴力修改全项目包名 (com.android.packageinstaller)
+      - name: 4. 修改包名
         run: |
-          OLD_ID="com.wxxsfxyzm.installerx"
-          NEW_ID="com.android.packageinstaller"
-          
-          echo "开始全量替换包名从 $OLD_ID 到 $NEW_ID ..."
-          
-          # 1. 遍历所有文件，只要内容包含旧包名，全部替换
-          # 这会覆盖 build.gradle.kts, AndroidManifest, Java/Kotlin 源码
-          grep -rl "$OLD_ID" . | xargs sed -i "s/$OLD_ID/$NEW_ID/g"
-          
-          # 2. 针对 Gradle 里的 applicationId 再次强化替换，确保万无一失
-          find . -name "build.gradle*" -exec sed -i "s/applicationId = \".*\"/applicationId = \"$NEW_ID\"/g" {} +
-          find . -name "build.gradle*" -exec sed -i "s/applicationId \".*\"/applicationId \"$NEW_ID\"/g" {} +
+          OLD="com.wxxsfxyzm.installerx"
+          NEW="com.android.packageinstaller"
+          echo "替换包名: $OLD -> $NEW"
+
+          # 替换所有文本文件中的包名
+          grep -rl --include="*.kt" --include="*.java" --include="*.xml" \
+               --include="*.gradle" --include="*.gradle.kts" --include="*.json" \
+               --include="*.pro" --include="*.properties" \
+               "$OLD" . | xargs sed -i "s|$OLD|$NEW|g"
+
+          # 强制确保 applicationId 正确
+          sed -i "s|applicationId = \".*\"|applicationId = \"$NEW\"|g" app/build.gradle.kts
+          sed -i "s|namespace = \".*\"|namespace = \"$NEW\"|g" app/build.gradle.kts
 
           chmod +x gradlew
-          echo "替换完成。"
 
-      - name: 5. 注入凭证
+          # 验证替换结果
+          echo "=== 验证 applicationId ==="
+          grep -n "applicationId" app/build.gradle.kts || echo "未找到 applicationId"
+          echo "=== 验证 AndroidManifest ==="
+          grep -n "package=" app/src/main/AndroidManifest.xml || echo "无package属性"
+
+      - name: 5. 注入 Gradle 凭证
         run: |
           mkdir -p ~/.gradle
           echo "gpr.user=${{ github.actor }}" >> ~/.gradle/gradle.properties
           echo "gpr.key=${{ secrets.GITHUB_TOKEN }}" >> ~/.gradle/gradle.properties
 
-      - name: 6. 执行编译 (Release)
-        run: ./gradlew assembleRelease --stacktrace --no-daemon
+      - name: 6. 编译 Release
+        run: ./gradlew assembleOfflineStableRelease --stacktrace --no-daemon
 
-      - name: 7. 推送至 Telegram
+      - name: 7. 整理 APK
+        run: |
+          mkdir -p dist
+          find app/build/outputs/apk/ -name "*.apk" | while read f; do
+            fname=$(basename "$f")
+            cp "$f" "dist/InstallerX-packageinstaller-${fname}"
+          done
+          echo "=== 构建产物 ==="
+          ls -lh dist/
+
+      - name: 8. 发送到 Telegram
         if: success()
         run: |
-          # 搜索所有 APK 并发送
-          APK_PATH=$(find app/build/outputs/apk/ -name "*.apk" | head -n 1)
-          APK_NAME=$(basename $APK_PATH)
-          
-          curl -v -F "chat_id=${{ secrets.TG_CHAT_ID }}" \
-               -F "document=@$APK_PATH" \
-               -F "caption=✅ 构建成功！%0A📦 已修改包名为: com.android.packageinstaller" \
-               "https://api.telegram.org/bot${{ secrets.TG_BOT_TOKEN }}/sendDocument"
+          for apk in dist/*.apk; do
+            echo "发送: $apk"
+            resp=$(curl -s \
+              -F "chat_id=${{ secrets.TG_CHAT_ID }}" \
+              -F "document=@$apk" \
+              -F "caption=✅ 构建成功
+📦 包名: com.android.packageinstaller
+🕐 $(date '+%Y-%m-%d %H:%M') UTC" \
+              "https://api.telegram.org/bot${{ secrets.TG_BOT_TOKEN }}/sendDocument")
+            echo "$resp"
+            if echo "$resp" | grep -q '"ok":false'; then
+              echo "❌ 发送失败"
+              exit 1
+            fi
+          done
 
-      - name: 8. 上传备份
+      - name: 9. 上传 Artifact 备份
         uses: actions/upload-artifact@v4
         with:
-          name: InstallerX-Final
-          path: app/build/outputs/apk/**/*.apk
+          name: InstallerX-packageinstaller
+          path: dist/*.apk
