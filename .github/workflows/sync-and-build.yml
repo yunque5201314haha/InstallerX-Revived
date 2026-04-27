@@ -104,8 +104,5 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: InstallerX-packageinstaller
-          path: dist/*.apk      - name: 9. 上传 Artifact 备份
-        uses: actions/upload-artifact@v4
-        with:
-          name: InstallerX-packageinstaller
           path: dist/*.apk
+
