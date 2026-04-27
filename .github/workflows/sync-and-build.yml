@@ -31,13 +31,14 @@ jobs:
           java-version: '21'
           distribution: 'temurin'
           cache: 'gradle'
-
-      - name: 4. 修改包名
+- name: 4. 修改包名
         run: |
           OLD="com.rosan.installer"
           NEW="com.android.packageinstaller"
 
-          echo "=== 1. 强制写死 applicationId ==="
+          echo "=== 1. 强制写死 applicationId (覆盖APP_ID property) ==="
+          find . -name "build.gradle.kts" | xargs sed -i \
+            "s|applicationId = project.findProperty.*|applicationId = \"$NEW\"|g"
           find . -name "build.gradle.kts" | xargs sed -i \
             "s|applicationId = \"[^\"]*\"|applicationId = \"$NEW\"|g"
 
@@ -50,18 +51,22 @@ jobs:
           find app/schemas -name "*.json" \
             | xargs --no-run-if-empty sed -i "s|${OLD}|${NEW}|g"
 
-          echo "=== 4. 重命名 schema 目录 ==="
-          for dir in app/schemas/com.rosan.*; do
+          echo "=== 4. 重命名 schema 目录 (保留完整后缀) ==="
+          for dir in app/schemas/${OLD}*; do
             [ -d "$dir" ] || continue
-            newdir=$(echo "$dir" | sed "s|com\.rosan\.installer[^/]*|${NEW}|g")
+            suffix="${dir#app/schemas/${OLD}}"
+            newdir="app/schemas/${NEW}${suffix}"
             mv "$dir" "$newdir"
             echo "重命名: $dir -> $newdir"
           done
 
+          echo "=== 5. 写死 APP_ID gradle.properties ==="
+          echo "APP_ID=${NEW}" >> gradle.properties
+
           chmod +x gradlew
 
           echo "=== 验证 ==="
-          grep -n "applicationId" app/build.gradle.kts
+          grep -n "applicationId\|APP_ID" app/build.gradle.kts
           ls app/schemas/
 
       - name: 5. 注入 Gradle 凭证
