@@ -34,21 +34,35 @@ jobs:
 
       - name: 4. 修改包名
         run: |
+          OLD="com.rosan.installer"
           NEW="com.android.packageinstaller"
 
-          echo "=== 强制写死 applicationId ==="
+          echo "=== 1. 强制写死 applicationId ==="
           find . -name "build.gradle.kts" | xargs sed -i \
             "s|applicationId = \"[^\"]*\"|applicationId = \"$NEW\"|g"
 
-          echo "=== 替换源码包名引用 (排除aidl) ==="
+          echo "=== 2. 替换 kt/java/xml (排除aidl) ==="
           grep -rl --include="*.kt" --include="*.java" --include="*.xml" \
-               "com.rosan.installer" . \
-            | xargs --no-run-if-empty sed -i "s|com\.rosan\.installer|com.android.packageinstaller|g"
+               "$OLD" . \
+            | xargs --no-run-if-empty sed -i "s|${OLD}|${NEW}|g"
+
+          echo "=== 3. 替换 schema json 内容 ==="
+          find app/schemas -name "*.json" \
+            | xargs --no-run-if-empty sed -i "s|${OLD}|${NEW}|g"
+
+          echo "=== 4. 重命名 schema 目录 ==="
+          for dir in app/schemas/com.rosan.*; do
+            [ -d "$dir" ] || continue
+            newdir=$(echo "$dir" | sed "s|com\.rosan\.installer[^/]*|${NEW}|g")
+            mv "$dir" "$newdir"
+            echo "重命名: $dir -> $newdir"
+          done
 
           chmod +x gradlew
 
           echo "=== 验证 ==="
           grep -n "applicationId" app/build.gradle.kts
+          ls app/schemas/
 
       - name: 5. 注入 Gradle 凭证
         run: |
