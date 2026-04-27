@@ -31,12 +31,13 @@ jobs:
           java-version: '21'
           distribution: 'temurin'
           cache: 'gradle'
-- name: 4. 修改包名
+
+      - name: 4. 修改包名
         run: |
           OLD="com.rosan.installer"
           NEW="com.android.packageinstaller"
 
-          echo "=== 1. 强制写死 applicationId (覆盖APP_ID property) ==="
+          echo "=== 1. 强制写死 applicationId ==="
           find . -name "build.gradle.kts" | xargs sed -i \
             "s|applicationId = project.findProperty.*|applicationId = \"$NEW\"|g"
           find . -name "build.gradle.kts" | xargs sed -i \
@@ -60,7 +61,7 @@ jobs:
             echo "重命名: $dir -> $newdir"
           done
 
-          echo "=== 5. 写死 APP_ID gradle.properties ==="
+          echo "=== 5. 写死 APP_ID ==="
           echo "APP_ID=${NEW}" >> gradle.properties
 
           chmod +x gradlew
