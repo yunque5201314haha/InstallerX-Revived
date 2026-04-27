@@ -40,9 +40,8 @@ jobs:
           find . -name "build.gradle.kts" | xargs sed -i \
             "s|applicationId = \"[^\"]*\"|applicationId = \"$NEW\"|g"
 
-          echo "=== 替换源码包名引用 ==="
+          echo "=== 替换源码包名引用 (排除aidl) ==="
           grep -rl --include="*.kt" --include="*.java" --include="*.xml" \
-               --include="*.aidl" \
                "com.rosan.installer" . \
             | xargs --no-run-if-empty sed -i "s|com\.rosan\.installer|com.android.packageinstaller|g"
 
