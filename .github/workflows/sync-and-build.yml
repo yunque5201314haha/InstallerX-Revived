@@ -34,18 +34,22 @@ jobs:
 
       - name: 4. 修改包名
         run: |
-          OLD="com.wxxsfxyzm.installerx"
           NEW="com.android.packageinstaller"
-          echo "替换包名: $OLD -> $NEW"
+
+          echo "=== 强制写死 applicationId ==="
+          find . -name "build.gradle.kts" | xargs sed -i \
+            "s|applicationId = \"[^\"]*\"|applicationId = \"$NEW\"|g"
+
+          echo "=== 替换源码包名引用 ==="
           grep -rl --include="*.kt" --include="*.java" --include="*.xml" \
-               --include="*.gradle" --include="*.gradle.kts" --include="*.json" \
-               --include="*.pro" --include="*.properties" \
-               "$OLD" . | xargs sed -i "s|$OLD|$NEW|g"
-          sed -i "s|applicationId = \".*\"|applicationId = \"$NEW\"|g" app/build.gradle.kts
-          sed -i "s|namespace = \".*\"|namespace = \"$NEW\"|g" app/build.gradle.kts
+               --include="*.aidl" \
+               "com.rosan.installer" . \
+            | xargs --no-run-if-empty sed -i "s|com\.rosan\.installer|com.android.packageinstaller|g"
+
           chmod +x gradlew
-          echo "=== 验证 applicationId ==="
-          grep -n "applicationId" app/build.gradle.kts || echo "未找到"
+
+          echo "=== 验证 ==="
+          grep -n "applicationId" app/build.gradle.kts
 
       - name: 5. 注入 Gradle 凭证
         run: |
