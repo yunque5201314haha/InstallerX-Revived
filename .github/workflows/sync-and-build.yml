@@ -32,7 +32,7 @@ jobs:
           distribution: 'temurin'
           cache: 'gradle'
 
-      - name: 4. 修改包名 (仅修改 ApplicationId，避开 Room 编译死穴)
+      - name: 4. 修改包名
         run: |
           NEW="com.android.packageinstaller"
           echo "APP_ID=${NEW}" >> gradle.properties
@@ -74,21 +74,13 @@ jobs:
           BUILD_TIME=$(date '+%Y-%m-%d %H:%M')
           REPO_URL="https://github.com/${REPO}"
           RUNS_URL="${REPO_URL}/actions/runs/${RUN_ID}"
-
+          printf "InstallerX 自动构建\n\n版本: %s\n提交: %s\n时间: %s UTC\n\n仓库: %s\n构建详情: %s\n\n#InstallerX更新" \
+            "$VERSION" "$ACTOR" "$BUILD_TIME" "$REPO_URL" "$RUNS_URL" > /tmp/caption.txt
           for apk in dist/*.apk; do
             resp=$(curl -s \
               -F "chat_id=${TG_CHAT}" \
               -F "document=@$apk" \
-              --form-string "caption=InstallerX 自动构建
-
-版本: ${VERSION}
-提交: ${ACTOR}
-时间: ${BUILD_TIME} UTC
-
-仓库: ${REPO_URL}
-构建详情: ${RUNS_URL}
-
-#InstallerX更新" \
+              -F "caption=$(cat /tmp/caption.txt)" \
               "https://api.telegram.org/bot${TG_TOKEN}/sendDocument")
             echo "$resp"
             if echo "$resp" | grep -q '"ok":false'; then
