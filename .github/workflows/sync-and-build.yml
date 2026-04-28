@@ -68,12 +68,20 @@ jobs:
           BUILD_TIME=$(date '+%Y-%m-%d %H:%M')
           REPO_URL="https://github.com/${{ github.repository }}"
           RUNS_URL="${REPO_URL}/actions/runs/${{ github.run_id }}"
-          MSG="InstallerX 自动构建%0A%0A版本: ${VERSION}%0A提交: ${{ github.actor }}%0A时间: ${BUILD_TIME} UTC%0A%0A${REPO_URL} | [Release 详情](${RUNS_URL})%0A%0A#InstallerX更新"
+
           for apk in dist/*.apk; do
             resp=$(curl -s \
               -F "chat_id=${{ secrets.TG_CHAT_ID }}" \
               -F "document=@$apk" \
-              -F "caption=${MSG}" \
+              --form-string "caption=InstallerX 自动构建
+
+版本: ${VERSION}
+提交: ${{ github.actor }}
+时间: ${BUILD_TIME} UTC
+
+${REPO_URL} | [Release 详情](${RUNS_URL})
+
+#InstallerX更新" \
               -F "parse_mode=Markdown" \
               "https://api.telegram.org/bot${{ secrets.TG_BOT_TOKEN }}/sendDocument")
             echo "$resp"
