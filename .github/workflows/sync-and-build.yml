@@ -35,20 +35,11 @@ jobs:
       - name: 4. 修改包名 (仅修改 ApplicationId，避开 Room 编译死穴)
         run: |
           NEW="com.android.packageinstaller"
-
-          echo "=== 1. 写入全局配置 APP_ID ==="
           echo "APP_ID=${NEW}" >> gradle.properties
-
-          echo "=== 2. 强改 build.gradle.kts 的 applicationId ==="
           sed -i "s|applicationId = project.findProperty(\"APP_ID\") as String?|applicationId = \"${NEW}\"|g" app/build.gradle.kts
           sed -i "s|applicationId = \"[^\"]*\"|applicationId = \"${NEW}\"|g" app/build.gradle.kts
-
-          echo "=== 3. 修改 FileProvider 防止冲突 ==="
           find app/src/main/ -name "AndroidManifest.xml" -exec sed -i "s/com.rosan.installer.fileprovider/${NEW}.fileprovider/g" {} +
-
           chmod +x gradlew
-
-          echo "=== 验证 ==="
           grep -n "applicationId\|namespace" app/build.gradle.kts
 
       - name: 5. 注入 Gradle 凭证
@@ -67,7 +58,6 @@ jobs:
             fname=$(basename "$f")
             cp "$f" "dist/InstallerX-packageinstaller-${fname}"
           done
-          echo "=== 构建产物 ==="
           ls -lh dist/
 
       - name: 8. 发送到 Telegram
@@ -78,19 +68,8 @@ jobs:
           BUILD_TIME=$(date '+%Y-%m-%d %H:%M')
           REPO_URL="https://github.com/${{ github.repository }}"
           RUNS_URL="${REPO_URL}/actions/runs/${{ github.run_id }}"
-
-          MSG="InstallerX 自动构建
-
-版本: ${VERSION}
-提交: ${{ github.actor }}
-时间: ${BUILD_TIME} UTC
-
-${REPO_URL} | [Release 详情](${RUNS_URL})
-
-#InstallerX更新"
-
+          MSG="InstallerX 自动构建%0A%0A版本: ${VERSION}%0A提交: ${{ github.actor }}%0A时间: ${BUILD_TIME} UTC%0A%0A${REPO_URL} | [Release 详情](${RUNS_URL})%0A%0A#InstallerX更新"
           for apk in dist/*.apk; do
-            echo "发送: $apk"
             resp=$(curl -s \
               -F "chat_id=${{ secrets.TG_CHAT_ID }}" \
               -F "document=@$apk" \
